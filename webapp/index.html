@@ -22,7 +22,7 @@
   <body>
     <div class="card">
       <h2>FOREVO — доступ по NFT</h2>
-      <p class="muted">Подключите TON-кошелёк. Я проверю наличие FOREVO NFT и отправлю кнопку для вступления в закрытый чат.</p>
+      <p class="muted">Подключите TON‑кошелёк. Я проверю наличие FOREVO NFT и отправлю кнопку для вступления в закрытый чат.</p>
 
       <div id="tc"></div>
       <p id="status" class="muted"></p>
@@ -33,17 +33,24 @@
       const tg = window.Telegram?.WebApp;
       tg?.expand();
 
-      // 1) Сохраняем tg_id если открыли через Telegram
-      const tgIdFromTelegram = tg?.initDataUnsafe?.user?.id;
-      if (tgIdFromTelegram) {
-        localStorage.setItem('tg_id', String(tgIdFromTelegram));
-      }
-      // 2) Берём tg_id из Telegram или localStorage
-      const getTgId = () => tg?.initDataUnsafe?.user?.id || localStorage.getItem('tg_id');
+      // --- 1) читаем tg_id из query (?tg_id=) и из Telegram SDK, сохраняем в localStorage ---
+      const params = new URLSearchParams(window.location.search);
+      const tgIdFromQuery = params.get('tg_id');
+      if (tgIdFromQuery) localStorage.setItem('tg_id', String(tgIdFromQuery));
 
+      const tgIdFromTelegram = tg?.initDataUnsafe?.user?.id;
+      if (tgIdFromTelegram) localStorage.setItem('tg_id', String(tgIdFromTelegram));
+
+      const getTgId = () => tg?.initDataUnsafe?.user?.id || tgIdFromQuery || localStorage.getItem('tg_id');
+
+      // --- 2) TonConnect UI ---
       const tcui = new TON_CONNECT_UI.TonConnectUI({
         manifestUrl: 'https://eloquent-panda-7f356a.netlify.app/webapp/tonconnect-manifest.json',
         buttonRootId: 'tc',
+        actionsConfiguration: {
+          // постараемся вернуть в Telegram после подключения
+          twaReturnUrl: window.location.href
+        }
       });
 
       async function waitConnected() {
@@ -69,11 +76,23 @@
           return;
         }
 
-        const r = await fetch('/api/verify', {
+        // ВНИМАНИЕ: если фронт на Netlify, а бэкенд на другом домене,
+        // здесь лучше указать полный URL до вашего API:
+        // const VERIFY_URL = 'https://<ВАШ_БЭКЕНД_ДОМЕН>/api/verify';
+        const VERIFY_URL = '/api/verify';
+
+        const r = await fetch(VERIFY_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tg_id, wallet })
-        });
+        }).catch(() => null);
+
+        if (!r || !r.ok) {
+          document.getElementById('result').innerHTML =
+            '<span class="err">Не удалось связаться с сервером проверки. Попробуйте позже.</span>';
+          return;
+        }
+
         const data = await r.json();
         if (data.ok) {
           document.getElementById('result').innerHTML =
