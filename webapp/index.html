@@ -22,7 +22,7 @@
   <body>
     <div class="card">
       <h2>FOREVO — доступ по NFT</h2>
-      <p class="muted">Подключите TON‑кошелёк. Я проверю наличие FOREVO NFT и отправлю кнопку для вступления в закрытый чат.</p>
+      <p class="muted">Подключите TON-кошелёк. Я проверю наличие FOREVO NFT и отправлю кнопку для вступления в закрытый чат.</p>
 
       <div id="tc"></div>
       <p id="status" class="muted"></p>
@@ -30,49 +30,60 @@
     </div>
 
     <script>
-      const tg = window.Telegram?.WebApp
-      tg?.expand()
+      const tg = window.Telegram?.WebApp;
+      tg?.expand();
+
+      // 1) Сохраняем tg_id если открыли через Telegram
+      const tgIdFromTelegram = tg?.initDataUnsafe?.user?.id;
+      if (tgIdFromTelegram) {
+        localStorage.setItem('tg_id', String(tgIdFromTelegram));
+      }
+      // 2) Берём tg_id из Telegram или localStorage
+      const getTgId = () => tg?.initDataUnsafe?.user?.id || localStorage.getItem('tg_id');
 
       const tcui = new TON_CONNECT_UI.TonConnectUI({
         manifestUrl: 'https://eloquent-panda-7f356a.netlify.app/webapp/tonconnect-manifest.json',
         buttonRootId: 'tc',
-      })
+      });
 
       async function waitConnected() {
-        const restored = await tcui.connectionRestored
-        if (restored) return tcui.account?.address
-        await tcui.openModal()
+        const restored = await tcui.connectionRestored;
+        if (restored) return tcui.account?.address;
+        await tcui.openModal();
         return new Promise((resolve) => {
           const unsub = tcui.onStatusChange((w) => {
-            if (w) { unsub(); resolve(tcui.account?.address) }
-          })
-        })
+            if (w) { unsub(); resolve(tcui.account?.address); }
+          });
+        });
       }
 
       ;(async () => {
-        document.getElementById('status').innerText = 'Ожидаю подключение кошелька…'
-        const wallet = await waitConnected()
-        document.getElementById('status').innerText = 'Кошелёк подключён: ' + wallet
+        document.getElementById('status').innerText = 'Ожидаю подключение кошелька…';
+        const wallet = await waitConnected();
+        document.getElementById('status').innerText = 'Кошелёк подключён: ' + wallet;
 
-        const tg_id = tg?.initDataUnsafe?.user?.id
+        const tg_id = getTgId();
         if (!tg_id) {
-          document.getElementById('result').innerHTML = '<span class="err">Не вижу ваш Telegram ID. Откройте эту страницу через кнопку бота.</span>'
-          return
+          document.getElementById('result').innerHTML =
+            '<span class="err">Не вижу ваш Telegram ID. Откройте эту страницу через кнопку бота.</span>';
+          return;
         }
 
         const r = await fetch('/api/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tg_id, wallet })
-        })
-        const data = await r.json()
+        });
+        const data = await r.json();
         if (data.ok) {
-          document.getElementById('result').innerHTML = '<span class="ok">NFT найден ✅. Вернитесь в бот — он пришлёт кнопку для вступления.</span>'
-          tg?.close()
+          document.getElementById('result').innerHTML =
+            '<span class="ok">NFT найден ✅. Вернитесь в бот — он пришлёт кнопку для вступления.</span>';
+          tg?.close();
         } else {
-          document.getElementById('result').innerHTML = '<span class="err">NFT не найден. Нужен FOREVO NFT на кошельке.</span>'
+          document.getElementById('result').innerHTML =
+            '<span class="err">NFT не найден. Нужен FOREVO NFT на кошельке.</span>';
         }
-      })()
+      })();
     </script>
   </body>
 </html>
